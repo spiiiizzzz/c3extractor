@@ -164,8 +164,12 @@ int main(int argc, char** argv) {
         }
         write(new_file, file_buff, file_size);
 
+        close(new_file);
+
         free(file_buff);
     }
+
+    close(f);
 
     // These printf's where used for debug, I'm leaving only the last one since it's the only one that's somewhat useful
     //printf("weird stuff: %s - %ld\n", weird_stuff, swap_endianness_64((uint64_t)&(weird_stuff[4])));
