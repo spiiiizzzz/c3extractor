@@ -2,7 +2,7 @@
 
 A very simple program to extract the assets from bundles used by the Construct 3 engine.
 
-The program was made with Linux in mind, but I accept merge requests if anyone wants to port it to Windows or MacOS
+The program was made with Linux in mind, but I accept merge requests if anyone wants to port it to Windows or MacOS.
 
 ## Compilation
 
