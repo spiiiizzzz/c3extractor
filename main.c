@@ -143,8 +143,10 @@ int main(int argc, char** argv) {
 
     // This is the part where we actually extract the files
 
-    mkdir(destination, S_IRWXU);
-    chdir(destination);
+    if (destination) {
+        mkdir(destination, S_IRWXU);
+        chdir(destination);
+    }
 
     for (size_t i = 0; i < count; i++) {
         size_t file_size = entries[i].second;
