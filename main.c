@@ -8,16 +8,16 @@
 #include <errno.h>
 
 typedef struct {
-    char first[4];          // Where the magic numbers are located, didn't find any purpose beyond that
-    char second[4];         // Could not find any use for "second" and "third"
-    uint32_t third;       
-    uint32_t entry_count;   // This only applies to the second leading something;
-} leading_something;        // The name doesn't really explain much, it's used for the first leading bytes of the assets bundle
+    char magic[4];          // Where the magic numbers are located, didn't find any purpose beyond that
+    char unknown[4];        // Could not find any use for these
+    uint32_t unknown2;       
+    uint32_t entry_count;   // This only applies to the second header;
+} header;                   // The name doesn't really explain much, it's used for the first leading bytes of the assets bundle
 
 typedef struct {
-    char first[20];         // Didn't find a use for these first bytes. They don't even seem necessary for the extraction
-    uint64_t second;        // Second and third both store the size of the entry
-    uint64_t third;         // Why are they duplicated? I dunno i didn't make this format
+    char unknown[20];               // Didn't find a use for these first bytes. They don't even seem necessary for the extraction
+    uint64_t file_size;             // Second and third both store the size of the entry
+    uint64_t file_size_duplicate;   // Why are they duplicated? I dunno i didn't make this format
     char char_count;
     char* name;
 } entry;
@@ -100,15 +100,15 @@ int main(int argc, char** argv) {
         exit(1);
     }
 
-    // You can expect two "leading somethings" at the start of the bundle
-    leading_something s1 = {0};
-    leading_something s2 = {0};
+    // You can expect two leading headers at the start of the bundle
+    header s1 = {0};
+    header s2 = {0};
     
-    read(f, &s1, sizeof(leading_something));
-    read(f, &s2, sizeof(leading_something));
+    read(f, &s1, sizeof(header));
+    read(f, &s2, sizeof(header));
 
     // check if the file is actually a construct 3 archive
-    if (strcmp(s1.first, "c3ab") != 0 || strcmp(s2.first, "fdir") != 0) {
+    if (strcmp(s1.magic, "c3ab") != 0 || strcmp(s2.magic, "fdir") != 0) {
         fprintf(stderr, "Error: File is not a construct 3 archive\n");
         exit(1);
     }
@@ -123,33 +123,41 @@ int main(int argc, char** argv) {
     for (size_t i = 0; i < count; i++) {
         entry *e = &entries[i];
 
-        read(f, &e->first, 20);
-        read(f, &e->second, 8);
-        read(f, &e->third, 8);
-        e->second = swap_endianness(e->second);
-        e->third = swap_endianness(e->third);
+        read(f, &e->unknown, 20);
+        read(f, &e->file_size, 8);
+        read(f, &e->file_size_duplicate, 8);
+        e->file_size = swap_endianness(e->file_size);
+        e->file_size_duplicate = swap_endianness(e->file_size_duplicate);
         read(f, &e->char_count, 1);
         e->name = malloc(e->char_count+1);
         read(f, e->name, e->char_count);
         e->name[e->char_count] = '\0';
     }
 
-    // What's "weird stuff"? The makers of the protocol felt it was necessary to mark the start of the actual files
+    // What's this? The makers of the protocol felt it was necessary to mark the start of the actual files
     // It's useless really since you already know the amount of entries and can infer their size, and therefore you
     // can infer where the actual files start, but whatever
-    char weird_stuff[12];
-
-    read(f, &weird_stuff, 12);
+    char blob_delimiter[12];
+    read(f, &blob_delimiter, 12);
 
     // This is the part where we actually extract the files
 
     if (destination) {
-        mkdir(destination, S_IRWXU);
-        chdir(destination);
+        int res;
+        res = mkdir(destination, S_IRWXU);
+        if (res != 0) {
+            fprintf(stderr, "Error: could not create destination directory: %s\n", strerror(errno));
+            exit(1);
+        } 
+        res = chdir(destination);
+        if (res != 0) {
+            fprintf(stderr, "Error: could not change directory to destination directory: %s\n", strerror(errno));
+            exit(1);
+        } 
     }
 
     for (size_t i = 0; i < count; i++) {
-        size_t file_size = entries[i].second;
+        size_t file_size = entries[i].file_size;
 
         char* file_buff = malloc(file_size);
     
@@ -172,17 +180,22 @@ int main(int argc, char** argv) {
     close(f);
 
     // These printf's where used for debug, I'm leaving only the last one since it's the only one that's somewhat useful
-    //printf("weird stuff: %s - %ld\n", weird_stuff, swap_endianness_64((uint64_t)&(weird_stuff[4])));
+    //printf("blob delimiter: %s - %ld\n", blob_delimiter, swap_endianness_64((uint64_t)&(blob_delimiter[4])));
 
-    //printf("s1: %s\n", s1.first);
-    //printf("s2: %s - %x\n", s2.first, s2.entry_count);
+    //printf("s1: %s\n", s1.magic);
+    //printf("s2: %s - %x\n", s2.magic, s2.entry_count);
 
     for (size_t i = 0; i < count; i++) {
         entry *e = &entries[i];
 
-        printf("Entry: %s - %d - %ld - %ld\n", e->name, e->char_count, e->second, e->third);
+        printf("Entry: %s - %d - %ld - %ld\n", e->name, e->char_count, e->file_size, e->file_size_duplicate);
     }
 
+    for (size_t i = 0; i < count; i++) {
+        entry *e = &entries[i];
+        free(e->name);
+    }
+    free(entries);
 
     return 0;
 }
