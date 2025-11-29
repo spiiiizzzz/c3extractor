@@ -22,24 +22,6 @@ typedef struct {
     char* name;
 } entry;
 
-uint32_t swap_endianness(uint32_t x) {
-    return ((x >> 24) & 0x000000FF) | 
-           ((x >> 8) & 0x0000FF00) | 
-           ((x << 8) & 0x00FF0000) | 
-           ((x << 24) & 0xFF000000);
-}
-
-uint64_t swap_endianness_64(uint64_t x) {
-    return ((x >> 56) & 0x00000000000000FFULL) | 
-           ((x >> 40) & 0x000000000000FF00ULL) | 
-           ((x >> 24) & 0x00000000FF000000ULL) | 
-           ((x >> 8)  & 0x00FF000000000000ULL) | 
-           ((x << 8)  & 0xFF00000000000000ULL) | 
-           ((x << 24) & 0x000000FF00000000ULL) | 
-           ((x << 40) & 0x0000FF0000000000ULL) | 
-           ((x << 56) & 0x00FF000000000000ULL);
-}
-
 // Full disclosure: this function was vibe-coded. It's the only part of the program that was.
 void create_directories(const char *path) {
     char dirpath[512];
@@ -113,7 +95,7 @@ int main(int argc, char** argv) {
         exit(1);
     }
     
-    s2.entry_count = swap_endianness(s2.entry_count);
+    s2.entry_count = __builtin_bswap32(s2.entry_count);
     
     size_t count = s2.entry_count;
 
@@ -126,8 +108,8 @@ int main(int argc, char** argv) {
         read(f, &e->unknown, 20);
         read(f, &e->file_size, 8);
         read(f, &e->file_size_duplicate, 8);
-        e->file_size = swap_endianness(e->file_size);
-        e->file_size_duplicate = swap_endianness(e->file_size_duplicate);
+        e->file_size = __builtin_bswap32(e->file_size);
+        e->file_size_duplicate = __builtin_bswap32(e->file_size_duplicate);
         read(f, &e->char_count, 1);
         e->name = malloc(e->char_count+1);
         read(f, e->name, e->char_count);
@@ -180,7 +162,7 @@ int main(int argc, char** argv) {
     close(f);
 
     // These printf's where used for debug, I'm leaving only the last one since it's the only one that's somewhat useful
-    //printf("blob delimiter: %s - %ld\n", blob_delimiter, swap_endianness_64((uint64_t)&(blob_delimiter[4])));
+    //printf("blob delimiter: %s - %ld\n", blob_delimiter, __builtin_bswap64((uint64_t)&(blob_delimiter[4])));
 
     //printf("s1: %s\n", s1.magic);
     //printf("s2: %s - %x\n", s2.magic, s2.entry_count);
