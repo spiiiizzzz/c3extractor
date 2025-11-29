@@ -1,3 +1,4 @@
+#include <asm-generic/errno-base.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,10 +15,12 @@ typedef struct {
     uint32_t entry_count;   // This only applies to the second header;
 } header;                   // The name doesn't really explain much, it's used for the first leading bytes of the assets bundle
 
-typedef struct {
-    char unknown[20];               // Didn't find a use for these first bytes. They don't even seem necessary for the extraction
+typedef struct __attribute__((__packed__)) {
+    uint64_t unknown;               // Didn't find a use for these first bytes. They don't even seem necessary for the extraction
+    uint64_t offset;                // The offset from the start of the blob. Not used in this current implementation but still included.
     uint64_t file_size;             // Second and third both store the size of the entry
     uint64_t file_size_duplicate;   // Why are they duplicated? I dunno i didn't make this format
+    uint32_t unknown2;
     char char_count;
     char* name;
 } entry;
@@ -105,12 +108,12 @@ int main(int argc, char** argv) {
     for (size_t i = 0; i < count; i++) {
         entry *e = &entries[i];
 
-        read(f, &e->unknown, 20);
-        read(f, &e->file_size, 8);
-        read(f, &e->file_size_duplicate, 8);
-        e->file_size = __builtin_bswap32(e->file_size);
-        e->file_size_duplicate = __builtin_bswap32(e->file_size_duplicate);
-        read(f, &e->char_count, 1);
+        read(f, e, sizeof(entry) - sizeof(char*));
+
+        e->offset = __builtin_bswap64(e->offset);
+        e->file_size = __builtin_bswap64(e->file_size);
+        e->file_size_duplicate = __builtin_bswap64(e->file_size_duplicate);
+
         e->name = malloc(e->char_count+1);
         read(f, e->name, e->char_count);
         e->name[e->char_count] = '\0';
@@ -127,7 +130,7 @@ int main(int argc, char** argv) {
     if (destination) {
         int res;
         res = mkdir(destination, S_IRWXU);
-        if (res != 0) {
+        if (res != 0 && errno != EEXIST) {
             fprintf(stderr, "Error: could not create destination directory: %s\n", strerror(errno));
             exit(1);
         } 
@@ -170,7 +173,7 @@ int main(int argc, char** argv) {
     for (size_t i = 0; i < count; i++) {
         entry *e = &entries[i];
 
-        printf("Entry: %s - %d - %ld - %ld\n", e->name, e->char_count, e->file_size, e->file_size_duplicate);
+        printf("Entry: %s - %d - %ld - %ld - %ld\n", e->name, e->char_count, e->file_size, e->file_size_duplicate, e->offset);
     }
 
     for (size_t i = 0; i < count; i++) {
