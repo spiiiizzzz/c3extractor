@@ -8,24 +8,35 @@
 #include <string.h>
 #include <errno.h>
 
+// The name Padding for some fields was chosen because those fields always seem to be empty
+// Because of this I assume that's what they are supposed to do
+
 typedef struct {
-    char magic1[4];          
-    char unknown[12];
-    char magic2[4];
+    char magic1[4];
+    char padding[4];
+    uint32_t unknown;       // TODO: find out what this number refers to
     uint32_t unknown2;
-    uint32_t unknown3;
-    uint32_t entry_count;
+    char magic2[4];
+    char padding2[4];
+    uint32_t entries_size;  // size in bytes of the entries (including the "blob" text for some reason?)
+    uint32_t entry_count;   // number of entries
 } header;
 
 typedef struct __attribute__((__packed__)) {
-    uint64_t unknown;               // Didn't find a use for these first bytes. They don't even seem necessary for the extraction
+    uint64_t padding;
     uint64_t offset;                // The offset from the start of the blob. Not used in this current implementation but still included.
     uint64_t file_size;             // Second and third both store the size of the entry
     uint64_t file_size_duplicate;   // Why are they duplicated? I dunno i didn't make this format
-    uint32_t unknown2;
+    uint32_t padding2;
     char char_count;
     char* name;
 } entry;
+
+// This is not used in the program, but i wanted to include it anyway for future reference
+typedef struct __attribute__((__packed__)) {
+    char tag[4]; // Always says "blob", probably just some kind of terminator
+    uint64_t blob_size;
+} blob_header;
 
 // Full disclosure: this function was vibe-coded. It's the only part of the program that was.
 void create_directories(const char *path) {
@@ -117,11 +128,9 @@ int main(int argc, char** argv) {
         e->name[e->char_count] = '\0';
     }
 
-    // What's this? The makers of the protocol felt it was necessary to mark the start of the actual files
-    // It's useless really since you already know the amount of entries and can infer their size, and therefore you
-    // can infer where the actual files start, but whatever
-    char blob_delimiter[12];
-    read(f, &blob_delimiter, 12);
+    
+    blob_header bh = {0};
+    read(f, &bh, sizeof(bh));
 
     // This is the part where we actually extract the files
 
@@ -162,17 +171,17 @@ int main(int argc, char** argv) {
 
     close(f);
 
-    // These printf's where used for debug, I'm leaving only the last one since it's the only one that's somewhat useful
-    //printf("blob delimiter: %s - %ld\n", blob_delimiter, __builtin_bswap64((uint64_t)&(blob_delimiter[4])));
+    // These printf's where used for debug
+    //printf("blob delimiter: %s - %lu\n", bh.tag, __builtin_bswap64(bh.blob_size));
 
     //printf("s1: %s\n", s1.magic);
     //printf("s2: %s - %x\n", s2.magic, s2.entry_count);
 
-    for (size_t i = 0; i < count; i++) {
+    /*for (size_t i = 0; i < count; i++) {
         entry *e = &entries[i];
 
         printf("Entry: %s - %d - %ld - %ld - %ld\n", e->name, e->char_count, e->file_size, e->file_size_duplicate, e->offset);
-    }
+    }*/
 
     for (size_t i = 0; i < count; i++) {
         entry *e = &entries[i];
