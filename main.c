@@ -9,11 +9,13 @@
 #include <errno.h>
 
 typedef struct {
-    char magic[4];          // Where the magic numbers are located, didn't find any purpose beyond that
-    char unknown[4];        // Could not find any use for these
-    uint32_t unknown2;       
-    uint32_t entry_count;   // This only applies to the second header;
-} header;                   // The name doesn't really explain much, it's used for the first leading bytes of the assets bundle
+    char magic1[4];          
+    char unknown[12];
+    char magic2[4];
+    uint32_t unknown2;
+    uint32_t unknown3;
+    uint32_t entry_count;
+} header;
 
 typedef struct __attribute__((__packed__)) {
     uint64_t unknown;               // Didn't find a use for these first bytes. They don't even seem necessary for the extraction
@@ -86,21 +88,17 @@ int main(int argc, char** argv) {
     }
 
     // You can expect two leading headers at the start of the bundle
-    header s1 = {0};
-    header s2 = {0};
+    header h = {0};
     
-    read(f, &s1, sizeof(header));
-    read(f, &s2, sizeof(header));
+    read(f, &h, sizeof(header));
 
     // check if the file is actually a construct 3 archive
-    if (strcmp(s1.magic, "c3ab") != 0 || strcmp(s2.magic, "fdir") != 0) {
+    if (strcmp(h.magic1, "c3ab") != 0 || strcmp(h.magic2, "fdir") != 0) {
         fprintf(stderr, "Error: File is not a construct 3 archive\n");
         exit(1);
     }
     
-    s2.entry_count = __builtin_bswap32(s2.entry_count);
-    
-    size_t count = s2.entry_count;
+    size_t count = __builtin_bswap32(h.entry_count);
 
     entry *entries = malloc(sizeof(entry)*count); 
 
